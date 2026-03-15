@@ -2,17 +2,20 @@
   font-family: Georgia, "Times New Roman", serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #183729;
+  color: #f5eeee;
   background:
-    radial-gradient(circle at top, rgba(225, 157, 72, 0.18), transparent 30%),
-    linear-gradient(180deg, #f7f0e1 0%, #eef4eb 55%, #e8efe5 100%);
+    radial-gradient(circle at top, rgba(186, 24, 27, 0.28), transparent 30%),
+    linear-gradient(180deg, #120607 0%, #090909 55%, #000000 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --ink: #183729;
-  --muted-ink: #4f655a;
-  --accent-strong: #a8591d;
+  --ink: #f5eeee;
+  --muted-ink: #b9a9a9;
+  --accent-strong: #d62828;
+  --panel-dark: #13090a;
+  --panel-soft: #1d1012;
+  --line-soft: rgba(255, 255, 255, 0.08);
 }
 
 * {
@@ -41,11 +44,11 @@ button {
 
 button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 14px 28px rgba(24, 55, 41, 0.12);
+  box-shadow: 0 16px 30px rgba(214, 40, 40, 0.18);
 }
 
 button:focus-visible {
-  outline: 3px solid rgba(168, 89, 29, 0.35);
+  outline: 3px solid rgba(214, 40, 40, 0.35);
   outline-offset: 3px;
 }
 
