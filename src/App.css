@@ -1,42 +1,322 @@
-#root {
-  max-width: 1280px;
+.app-shell {
+  width: min(980px, 100%);
   margin: 0 auto;
-  padding: 2rem;
+  display: grid;
+  gap: 1.2rem;
+}
+
+.page-header,
+.panel,
+.timer-banner {
+  background: #111827;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 20px;
+  padding: 1.2rem;
+  box-shadow: 0 10px 24px -18px rgba(2, 6, 23, 0.85);
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  overflow: hidden;
+}
+
+.header-meta {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.meta-chip,
+.complete-badge,
+.status-pill {
+  border-radius: 999px;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  padding: 0.32rem 0.78rem;
+  background: #1f2937;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #d1d5db;
+  font-weight: 600;
+}
+
+.status-active {
+  color: #93c5fd;
+}
+
+.status-timeup,
+.status-completed {
+  color: #fcd34d;
+}
+
+.timer-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  overflow: hidden;
+}
+
+.timer-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.panel h1,
+.panel h2,
+.panel h3,
+.page-header h1 {
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.home-panel {
   text-align: center;
+  padding-block: 2.5rem;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.subtle {
+  color: #9ca3af;
+  margin: 0;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+.field {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+input {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+  padding: 0.72rem 0.84rem;
+  font: inherit;
+  background: #0f172a;
+  color: #e2e8f0;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+input:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.5);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
+}
+
+input::placeholder {
+  color: #64748b;
+}
+
+.button-stack,
+.row-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.primary-btn,
+.secondary-btn,
+.ghost-btn,
+.option-btn {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0.66rem 0.95rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease,
+    border-color 180ms ease;
+}
+
+.primary-btn {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 8px 16px -12px rgba(37, 99, 235, 0.9);
+}
+
+.secondary-btn {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.ghost-btn {
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #cbd5e1;
+}
+
+.primary-btn:hover,
+.secondary-btn:hover,
+.ghost-btn:hover,
+.option-btn:hover {
+  transform: translateY(-1px);
+  filter: none;
+}
+
+.primary-btn:hover {
+  box-shadow: 0 10px 18px -12px rgba(37, 99, 235, 0.85);
+}
+
+.poi-list-mini,
+.poi-cards,
+.quiz-stack,
+.leaderboard-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.poi-mini-item,
+.poi-card,
+.quiz-card,
+.leader-item {
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 14px;
+  padding: 0.85rem;
+  background: #0f172a;
+}
+
+.poi-mini-item {
+  display: flex;
+  justify-content: space-between;
+}
+
+.poi-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.poi-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 10px 18px -16px rgba(37, 99, 235, 0.7);
+}
+
+.poi-card.done {
+  border-color: rgba(52, 211, 153, 0.5);
+  background: rgba(6, 78, 59, 0.45);
+}
+
+.complete-badge {
+  background: rgba(6, 95, 70, 0.75);
+  border-color: rgba(74, 222, 128, 0.7);
+  color: #bbf7d0;
+}
+
+.warning-box {
+  border: 1px solid rgba(251, 146, 60, 0.45);
+  border-radius: 12px;
+  background: rgba(69, 26, 3, 0.55);
+  color: #fed7aa;
+  padding: 0.8rem;
+}
+
+.poi-image {
+  width: 100%;
+  height: 240px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 16px 30px -24px rgba(15, 23, 42, 0.85);
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.option-btn {
+  background: #111827;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #e2e8f0;
+  text-align: left;
+}
+
+.option-btn.active {
+  border-color: rgba(96, 165, 250, 0.75);
+  background: rgba(30, 64, 175, 0.45);
+  box-shadow: 0 8px 14px -14px rgba(37, 99, 235, 0.8);
+}
+
+.leaderboard-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leader-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.progress-shell {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.progress-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: #1f2937;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #0ea5e9 60%, #22c55e);
+  box-shadow: none;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+  .panel,
+  .timer-banner,
+  .page-header {
+    animation: cardEnter 420ms ease both;
   }
 }
 
-.card {
-  padding: 2em;
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.read-the-docs {
-  color: #888;
+@media (max-width: 640px) {
+  .option-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .timer-banner,
+  .page-header,
+  .poi-card,
+  .leader-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
