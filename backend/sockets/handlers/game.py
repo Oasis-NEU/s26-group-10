@@ -1,41 +1,37 @@
 import asyncio
 from db.client import supabase
 
-active_timers = {}  # game_code -> asyncio.Task
+active_timers = {}
 
 def register(sio):
 
     @sio.event
     async def game_start(sid, data):
-        # data = { "code": "QB26F3", "user_id": "..." }
         code = data["code"]
 
-        # Verify the requester is the host
         game = supabase.table("games")\
             .select("*")\
             .eq("code", code)\
-            .single().execute()
+            .maybe_single().execute()
 
-        if not game.data:
+        if not game or not game.data:
             await sio.emit("error", {"message": "Game not found"}, to=sid)
             return
 
         user = supabase.table("users")\
             .select("leader")\
             .eq("id", data["user_id"])\
-            .single().execute()
+            .maybe_single().execute()
 
-        if not user.data or not user.data["leader"]:
+        if not user or not user.data or not user.data["leader"]:
             await sio.emit("error", {"message": "Only the host can start the game"}, to=sid)
             return
 
-        # Update game status
         supabase.table("games").update({
             "status": "active",
             "started_at": "now()",
         }).eq("code", code).execute()
 
-        # Fetch locations for this map
         locations = supabase.table("map_location")\
             .select("locations(*)")\
             .eq("map_id", game.data["map_id"])\
@@ -46,7 +42,6 @@ def register(sio):
             "timer_seconds": game.data["timer_seconds"],
         }, room=code)
 
-        # Start the countdown
         task = asyncio.create_task(run_timer(code, game.data["timer_seconds"], sio))
         active_timers[code] = task
 
@@ -67,9 +62,11 @@ def register(sio):
         game = supabase.table("games")\
             .select("id")\
             .eq("code", code)\
-            .single().execute()
+            .maybe_single().execute()
 
-        # Get final scores ordered by score desc
+        if not game or not game.data:
+            return
+
         scores = supabase.table("score")\
             .select("score, users(id, name)")\
             .eq("game_id", game.data["id"])\
@@ -85,7 +82,6 @@ def register(sio):
             for row in scores.data
         ]
 
-        # Mark winner
         if leaderboard:
             supabase.table("games").update({
                 "winner_id": leaderboard[0]["user_id"]
