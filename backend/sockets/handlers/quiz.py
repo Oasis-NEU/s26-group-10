@@ -49,6 +49,16 @@ def register(sio):
             await sio.emit("error", {"message": "No questions found"}, to=sid)
             return
 
+        # Prevent double scoring
+        existing = supabase.table("player_visits").select("id")\
+            .eq("player_id", data["user_id"])\
+            .eq("location_id", data["location_id"])\
+            .execute()
+
+        if existing.data:
+            await sio.emit("error", {"message": "Already scored this location"}, to=sid)
+            return
+
         correct = sum(
             1 for q, a in zip(questions.data, data["answers"])
             if q["correct_answer"] == a
@@ -70,6 +80,12 @@ def register(sio):
             "game_id": data["game_id"],
             "player_id": data["user_id"],
             "amount": points_earned,
+        }).execute()
+
+        # Record the visit so they can't score this location again
+        supabase.table("player_visits").insert({
+            "player_id": data["user_id"],
+            "location_id": data["location_id"],
         }).execute()
 
         await sio.emit("quiz_result", {
