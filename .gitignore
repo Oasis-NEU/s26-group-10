@@ -26,3 +26,10 @@ dist-ssr
 #env
 .env
 backend/api.env
+
+# Python cache
+__pycache__/
+backend/__pycache__/
+*.py[cod]
+*$py.class
+main.cpython-313.pyc
