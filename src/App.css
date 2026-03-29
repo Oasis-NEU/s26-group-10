@@ -29,11 +29,16 @@
 
 .meta-chip,
 .complete-badge,
+.failed-badge,
 .status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   border-radius: 999px;
   font-size: 0.78rem;
   letter-spacing: 0.02em;
-  padding: 0.32rem 0.78rem;
+  padding: 0.4rem 0.8rem;
   background: #1f2937;
   border: 1px solid rgba(148, 163, 184, 0.3);
   color: #d1d5db;
@@ -214,10 +219,21 @@ input::placeholder {
   background: rgba(6, 78, 59, 0.45);
 }
 
+.poi-card.failed {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(127, 29, 29, 0.45);
+}
+
 .complete-badge {
   background: rgba(6, 95, 70, 0.75);
   border-color: rgba(74, 222, 128, 0.7);
   color: #bbf7d0;
+}
+
+.failed-badge {
+  background: rgba(153, 27, 27, 0.75);
+  border-color: rgba(248, 113, 113, 0.7);
+  color: #fecaca;
 }
 
 .warning-box {
@@ -266,6 +282,41 @@ input::placeholder {
   justify-content: space-between;
   gap: 0.6rem;
   align-items: center;
+}
+
+.result-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.result-correct {
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.result-wrong {
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.result-label {
+  color: #9ca3af;
+}
+
+.answer-correct {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.answer-wrong {
+  color: #f87171;
+  font-weight: 600;
+  text-decoration: line-through;
 }
 
 .progress-shell {

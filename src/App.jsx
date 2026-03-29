@@ -20,8 +20,10 @@ function App() {
   const [selectedPoiId, setSelectedPoiId] = useState(null)
   const [arrivedMap, setArrivedMap] = useState({})
   const [completedMap, setCompletedMap] = useState({})
+  const [failedMap, setFailedMap] = useState({})
   const [quizAnswers, setQuizAnswers] = useState({})
   const [quizResultByPoi, setQuizResultByPoi] = useState({})
+  const [quizResultDetail, setQuizResultDetail] = useState(null)
   const [userId, setUserId] = useState('')
   const [gameId, setGameId] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -148,8 +150,12 @@ function App() {
         },
       }))
       setCompletedMap((prev) => ({ ...prev, [currentPoiId]: true }))
+      if (!payload.passed) {
+        setFailedMap((prev) => ({ ...prev, [currentPoiId]: true }))
+      }
+      setQuizResultDetail({ poiId: currentPoiId, ...payload })
       setErrorMessage('')
-      setScreen('poi-list')
+      setScreen('quiz-result')
     }
 
     const onGameEnded = (payload) => {
@@ -311,8 +317,10 @@ function App() {
     setSelectedPoiId(null)
     setArrivedMap({})
     setCompletedMap({})
+    setFailedMap({})
     setQuizAnswers({})
     setQuizResultByPoi({})
+    setQuizResultDetail(null)
     setUserId('')
     setGameId('')
     setErrorMessage('')
@@ -461,18 +469,23 @@ function App() {
           <div className="poi-cards">
             {pois.map((poi, idx) => {
               const isComplete = !!completedMap[poi.id]
+              const isFailed = !!failedMap[poi.id]
+              const cardClass = `poi-card${isFailed ? ' failed' : isComplete ? ' done' : ''}`
               return (
-                <article key={poi.id} className={`poi-card ${isComplete ? 'done' : ''}`}>
+                <article key={poi.id} className={cardClass}>
                   <div>
                     <p className="eyebrow">POI #{idx + 1}</p>
                     <h3>{poi.title}</h3>
                     <p className="subtle">Distance: {poi.distanceMeters}m</p>
                   </div>
-                  <div className="row-actions">
-                    {isComplete && <span className="complete-badge">Complete</span>}
-                    <button className="primary-btn" onClick={() => openPoi(poi.id)}>
-                      {isComplete ? 'Review' : 'Open'}
-                    </button>
+                  <div className="row-actions" style={{ alignItems: 'center' }}>
+                    {isFailed && <span className="failed-badge">Wrong Answer</span>}
+                    {isComplete && !isFailed && <span className="complete-badge">Complete</span>}
+                    {!isComplete && (
+                      <button className="primary-btn" onClick={() => openPoi(poi.id)}>
+                        Open
+                      </button>
+                    )}
                   </div>
                 </article>
               )
@@ -560,6 +573,48 @@ function App() {
               Submit
             </button>
           </div>
+        </section>
+      )}
+
+      {/* QUIZ RESULT */}
+      {screen === 'quiz-result' && quizResultDetail && (
+        <section className="panel">
+          <div>
+            {quizResultDetail.passed ? (
+              <>
+                <p className="eyebrow" style={{ color: '#4ade80' }}>All Correct!</p>
+                <h2>+{quizResultDetail.points_earned} pts</h2>
+              </>
+            ) : (
+              <>
+                <p className="eyebrow" style={{ color: '#f87171' }}>Incorrect</p>
+                <h2>{quizResultDetail.correct}/{quizResultDetail.total} correct · +{quizResultDetail.points_earned} pts</h2>
+              </>
+            )}
+          </div>
+          <div className="quiz-stack">
+            {quizResultDetail.breakdown.map((item, i) => (
+              <article key={i} className={`quiz-card result-card ${item.is_correct ? 'result-correct' : 'result-wrong'}`}>
+                <p style={{ marginBottom: '0.5rem' }}><strong>Q{i + 1}.</strong> {item.question}</p>
+                <div className="result-row">
+                  <span className="result-label">Your answer:</span>
+                  <span className={item.is_correct ? 'answer-correct' : 'answer-wrong'}>
+                    {item.submitted_answer ?? '—'}
+                    {item.is_correct ? ' ✓' : ' ✗'}
+                  </span>
+                </div>
+                {!item.is_correct && (
+                  <div className="result-row">
+                    <span className="result-label">Correct answer:</span>
+                    <span className="answer-correct">{item.correct_answer} ✓</span>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+          <button className="primary-btn" onClick={() => setScreen('poi-list')}>
+            Back to Map
+          </button>
         </section>
       )}
 

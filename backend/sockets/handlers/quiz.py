@@ -95,8 +95,22 @@ def register(sio):
             "location_id": data["location_id"],
         }).execute()
 
+        breakdown = [
+            {
+                "question": q.get("body", ""),
+                "correct_answer": normalize(q["correct_answer"]),
+                "submitted_answer": normalize(a) if a is not None else None,
+                "is_correct": a is not None and normalize(q["correct_answer"]) == normalize(a),
+            }
+            for q, a in zip(questions.data, data["answers"])
+        ]
+
+        passed = correct == len(questions.data)
+
         await sio.emit("quiz_result", {
             "correct": correct,
             "total": len(questions.data),
             "points_earned": points_earned,
+            "passed": passed,
+            "breakdown": breakdown,
         }, to=sid)
