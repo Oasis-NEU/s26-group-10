@@ -2,12 +2,24 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import TimerBanner from './components/TimerBanner'
 import ProgressBar from './components/ProgressBar'
-import { SAMPLE_LEADERBOARD, SAMPLE_POIS } from './data/mockData'
+import { SAMPLE_POIS } from './data/mockData'
 import {
   calculatePoiScore,
   generateSessionCode,
   getGameStatus,
 } from './utils/game'
+import {
+  addPlayerToGame,
+  addScore,
+  createGame,
+  createUser,
+  findGameByCode,
+  getGameLocations,
+  getLeaderboard,
+  getOrCreateDefaultMap,
+  initPlayerScore,
+  recordVisit,
+} from './lib/db'
 
 function App() {
   const [screen, setScreen] = useState('home')
@@ -22,6 +34,11 @@ function App() {
   const [completedMap, setCompletedMap] = useState({})
   const [quizAnswers, setQuizAnswers] = useState({})
   const [quizResultByPoi, setQuizResultByPoi] = useState({})
+  const [userId, setUserId] = useState(null)
+  const [gameId, setGameId] = useState(null)
+  const [leaderboard, setLeaderboard] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
   const selectedPoi = useMemo(
     () => pois.find((poi) => poi.id === selectedPoiId) ?? null,
@@ -71,6 +88,11 @@ function App() {
     }
   }, [gameStatus, screen])
 
+  useEffect(() => {
+    if (screen !== 'leaderboard' || !gameId) return
+    getLeaderboard(gameId).then(setLeaderboard).catch(console.error)
+  }, [screen, gameId])
+
   const startCreate = () => {
     setMode('host')
     setSessionCode(generateSessionCode())
@@ -83,20 +105,61 @@ function App() {
     setScreen('join')
   }
 
-  const submitJoin = () => {
+  const submitJoin = async () => {
     const cleaned = joinCodeInput.trim().toUpperCase()
-    if (!cleaned) return
-    setSessionCode(cleaned)
-    if (!selectedPoiId && pois[0]) {
-      setSelectedPoiId(pois[0].id)
+    if (!cleaned || !playerName.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const game = await findGameByCode(cleaned)
+      const user = await createUser(playerName.trim(), false)
+      await addPlayerToGame(user.id, game.id)
+      await initPlayerScore(user.id, game.id)
+      const locations = await getGameLocations(game.map_id)
+
+      setUserId(user.id)
+      setGameId(game.id)
+      setSessionCode(cleaned)
+      if (locations.length > 0) {
+        setPois(locations)
+        setSelectedPoiId(locations[0].id)
+      } else if (pois[0]) {
+        setSelectedPoiId(pois[0].id)
+      }
+      setScreen('poi-list')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-    setScreen('poi-list')
   }
 
-  const startSession = () => {
+  const startSession = async () => {
     if (pois.length === 0) return
-    setSelectedPoiId(pois[0].id)
-    setScreen('poi-list')
+    setLoading(true)
+    setError(null)
+    try {
+      const mapId = await getOrCreateDefaultMap()
+      const user = await createUser(playerName.trim() || 'Host', true)
+      const game = await createGame(sessionCode, mapId)
+      await addPlayerToGame(user.id, game.id)
+      await initPlayerScore(user.id, game.id)
+      const locations = await getGameLocations(mapId)
+
+      setUserId(user.id)
+      setGameId(game.id)
+      if (locations.length > 0) {
+        setPois(locations)
+        setSelectedPoiId(locations[0].id)
+      } else {
+        setSelectedPoiId(pois[0].id)
+      }
+      setScreen('poi-list')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const openPoi = (poiId) => {
@@ -104,10 +167,13 @@ function App() {
     setScreen('poi-check')
   }
 
-  const markArrived = (value) => {
+  const markArrived = async (value) => {
     if (!selectedPoi) return
     setArrivedMap((prev) => ({ ...prev, [selectedPoi.id]: value }))
     if (value) {
+      if (userId) {
+        recordVisit(userId, selectedPoi.id).catch(console.error)
+      }
       setScreen('poi-detail')
     }
   }
@@ -142,6 +208,11 @@ function App() {
       [selectedPoi.id]: { correctAnswers, totalQuestions, score },
     }))
     setCompletedMap((prev) => ({ ...prev, [selectedPoi.id]: true }))
+
+    if (userId && gameId && score > 0) {
+      addScore(userId, gameId, score).catch(console.error)
+    }
+
     setScreen('poi-list')
   }
 
@@ -158,6 +229,10 @@ function App() {
     setCompletedMap({})
     setQuizAnswers({})
     setQuizResultByPoi({})
+    setUserId(null)
+    setGameId(null)
+    setLeaderboard([])
+    setError(null)
   }
 
   const renderHeader = () => {
@@ -180,6 +255,9 @@ function App() {
   return (
     <main className="app-shell">
       {renderHeader()}
+
+      {loading && <p className="subtle" style={{ textAlign: 'center' }}>Loading…</p>}
+      {error && <p className="warning-box">{error}</p>}
 
       {['poi-list', 'poi-check', 'poi-detail', 'quiz'].includes(screen) && (
         <TimerBanner
@@ -392,25 +470,25 @@ function App() {
           <h2>Leaderboard</h2>
           <p className="subtle">Session ended. Final ranking is shown below.</p>
           <ol className="leaderboard-list">
-            {[
-              ...SAMPLE_LEADERBOARD,
-              {
-                id: 'self',
-                name: playerName || 'You',
-                score: totalScore,
-                completed: completedCount,
-                timeBonus: Math.floor(secondsRemaining / 60),
-              },
-            ]
-              .sort((a, b) => b.score - a.score)
-              .map((entry) => (
-                <li key={entry.id} className="leader-item">
-                  <span>{entry.name}</span>
-                  <span>
-                    {entry.score} pts · {entry.completed} POIs · +{entry.timeBonus} bonus
-                  </span>
-                </li>
-              ))}
+            {(leaderboard.length > 0
+              ? leaderboard
+              : [
+                  {
+                    id: 'self',
+                    name: playerName || 'You',
+                    score: totalScore,
+                    completed: completedCount,
+                    timeBonus: Math.floor(secondsRemaining / 60),
+                  },
+                ]
+            ).map((entry) => (
+              <li key={entry.id} className="leader-item">
+                <span>{entry.name}</span>
+                <span>
+                  {entry.score} pts · {entry.completed} POIs · +{entry.timeBonus} bonus
+                </span>
+              </li>
+            ))}
           </ol>
           <button className="primary-btn" onClick={resetGame}>
             Back to Start
