@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import TimerBanner from './components/TimerBanner'
 import ProgressBar from './components/ProgressBar'
-import { SAMPLE_LEADERBOARD, SAMPLE_POIS } from './data/mockData'
-import {
-  calculatePoiScore,
-  generateSessionCode,
-  getGameStatus,
-} from './utils/game'
+import { SAMPLE_LEADERBOARD } from './data/mockData'
+import { getGameStatus } from './utils/game'
+import { connectSocket, disconnectSocket, socket } from './lib/socket'
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
+const DEFAULT_MAP_ID = import.meta.env.VITE_DEFAULT_MAP_ID ?? 'b5158f57-3278-4ddd-9cb4-a434d1c4449b'
 
 function App() {
   const [screen, setScreen] = useState('home')
@@ -16,12 +16,24 @@ function App() {
   const [sessionCode, setSessionCode] = useState('')
   const [playerName, setPlayerName] = useState('')
   const [secondsRemaining, setSecondsRemaining] = useState(20 * 60)
-  const [pois, setPois] = useState(SAMPLE_POIS)
-  const [selectedPoiId, setSelectedPoiId] = useState(SAMPLE_POIS[0].id)
+  const [pois, setPois] = useState([])
+  const [selectedPoiId, setSelectedPoiId] = useState(null)
   const [arrivedMap, setArrivedMap] = useState({})
   const [completedMap, setCompletedMap] = useState({})
   const [quizAnswers, setQuizAnswers] = useState({})
   const [quizResultByPoi, setQuizResultByPoi] = useState({})
+  const [userId, setUserId] = useState('')
+  const [gameId, setGameId] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [leaderboard, setLeaderboard] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [gameStarted, setGameStarted] = useState(false)
+
+  const modeRef = useRef(mode)
+  useEffect(() => { modeRef.current = mode }, [mode])
+
+  const selectedPoiIdRef = useRef(selectedPoiId)
+  useEffect(() => { selectedPoiIdRef.current = selectedPoiId }, [selectedPoiId])
 
   const selectedPoi = useMemo(
     () => pois.find((poi) => poi.id === selectedPoiId) ?? null,
@@ -48,55 +60,183 @@ function App() {
     [quizResultByPoi],
   )
 
+  // Socket listeners — runs ONCE on mount, refs keep values fresh
   useEffect(() => {
-    if (!['poi-list', 'poi-check', 'poi-detail', 'quiz'].includes(screen)) {
+    connectSocket()
+
+    const onJoinConfirmed = (payload) => {
+      setUserId(payload.user_id)
+      setGameId(payload.game_id)
+      setSessionCode(payload.code)
+      setErrorMessage('')
+      if (modeRef.current === 'host') {
+        setScreen('lobby')
+      } else {
+        setScreen('waiting')
+      }
+    }
+
+    const onLobbyUpdated = (payload) => {
+      console.log('Lobby updated:', payload.players)
+    }
+
+    const onGameStarted = (payload) => {
+      const mappedPois = (payload.locations ?? []).map((loc) => ({
+        id: loc.id,
+        title: loc.name,
+        description: loc.info ?? '',
+        distanceMeters: 0,
+        points: loc.point_value ?? 100,
+        imageUrl: '',
+        quiz: [],
+      }))
+      setPois(mappedPois)
+      if (mappedPois.length > 0) setSelectedPoiId(mappedPois[0].id)
+      setSecondsRemaining(payload.timer_seconds ?? 20 * 60)
+      setGameStarted(true)
+      setScreen('poi-list')
+    }
+
+    const onTimerTick = (payload) => {
+      setSecondsRemaining(payload.seconds_remaining)
+    }
+
+    const onLocationReached = (payload) => {
+      const location = payload.location
+      if (!location) return
+
+      setPois((prev) =>
+        prev.map((poi) =>
+          poi.id === location.id
+            ? {
+                ...poi,
+                title: location.name ?? poi.title,
+                description: location.info ?? poi.description,
+                points: location.point_value ?? poi.points,
+                quiz: (payload.questions ?? []).map((q) => ({
+                  id: q.id,
+                  prompt: q.body,
+                  options: Array.isArray(q.options)
+                    ? q.options
+                    : JSON.parse(q.options ?? '[]'),
+                  answerIndex: 0,
+                })),
+              }
+            : poi,
+        ),
+      )
+
+      setArrivedMap((prev) => ({ ...prev, [location.id]: true }))
+      setErrorMessage('')
+      setScreen('poi-detail')
+    }
+
+    const onLocationTooFar = (payload) => {
+      setErrorMessage(payload?.message ?? 'You are too far from this location.')
+      setArrivedMap((prev) => ({ ...prev, [selectedPoiIdRef.current]: false }))
+    }
+
+    const onQuizResult = (payload) => {
+      const currentPoiId = selectedPoiIdRef.current
+      if (!currentPoiId) return
+      setQuizResultByPoi((prev) => ({
+        ...prev,
+        [currentPoiId]: {
+          correctAnswers: payload.correct,
+          totalQuestions: payload.total,
+          score: payload.points_earned,
+        },
+      }))
+      setCompletedMap((prev) => ({ ...prev, [currentPoiId]: true }))
+      setErrorMessage('')
+      setScreen('poi-list')
+    }
+
+    const onGameEnded = (payload) => {
+      setLeaderboard(payload.leaderboard ?? [])
+      setScreen('leaderboard')
+    }
+
+    const onSocketError = (payload) => {
+      setErrorMessage(payload?.message ?? 'Something went wrong. Please try again.')
+      setIsLoading(false)
+    }
+
+    socket.on('join_confirmed', onJoinConfirmed)
+    socket.on('lobby_updated', onLobbyUpdated)
+    socket.on('game_started', onGameStarted)
+    socket.on('timer_tick', onTimerTick)
+    socket.on('location_reached', onLocationReached)
+    socket.on('location_too_far', onLocationTooFar)
+    socket.on('quiz_result', onQuizResult)
+    socket.on('game_ended', onGameEnded)
+    socket.on('error', onSocketError)
+
+    return () => {
+      socket.off('join_confirmed', onJoinConfirmed)
+      socket.off('lobby_updated', onLobbyUpdated)
+      socket.off('game_started', onGameStarted)
+      socket.off('timer_tick', onTimerTick)
+      socket.off('location_reached', onLocationReached)
+      socket.off('location_too_far', onLocationTooFar)
+      socket.off('quiz_result', onQuizResult)
+      socket.off('game_ended', onGameEnded)
+      socket.off('error', onSocketError)
+      disconnectSocket()
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const startSession = async () => {
+    if (!playerName.trim()) {
+      setErrorMessage('Please enter your name.')
       return
     }
+    setIsLoading(true)
+    setErrorMessage('')
 
-    if (gameStatus !== 'active') {
-      setScreen('leaderboard')
-      return
+    try {
+      const res = await fetch(`${BACKEND_URL}/party`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          host_name: playerName.trim(),
+          map_id: DEFAULT_MAP_ID,
+          timer_seconds: 20 * 60,
+          max_players: 10,
+          start_lat: 42.3432,
+          start_lng: -71.0907,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail ?? 'Failed to create party')
+
+      setSessionCode(data.code)
+      setUserId(data.user_id)
+      setGameId(data.game_id)
+
+      socket.emit('party_join', { code: data.code, name: playerName.trim(), user_id: data.user_id })
+    } catch (err) {
+      setErrorMessage(err.message)
+    } finally {
+      setIsLoading(false)
     }
-
-    const timer = setInterval(() => {
-      setSecondsRemaining((prev) => Math.max(0, prev - 1))
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [screen, gameStatus])
-
-  useEffect(() => {
-    if (gameStatus !== 'active' && screen !== 'leaderboard') {
-      setScreen('leaderboard')
-    }
-  }, [gameStatus, screen])
-
-  const startCreate = () => {
-    setMode('host')
-    setSessionCode(generateSessionCode())
-    setSecondsRemaining(20 * 60)
-    setScreen('create')
   }
 
-  const goJoin = () => {
-    setMode('player')
-    setScreen('join')
+  const triggerGameStart = () => {
+    if (!sessionCode || !userId) return
+    socket.emit('game_start', { code: sessionCode, user_id: userId })
   }
 
   const submitJoin = () => {
     const cleaned = joinCodeInput.trim().toUpperCase()
     if (!cleaned) return
-    setSessionCode(cleaned)
-    if (!selectedPoiId && pois[0]) {
-      setSelectedPoiId(pois[0].id)
+    if (!playerName.trim()) {
+      setErrorMessage('Please enter your name before joining.')
+      return
     }
-    setScreen('poi-list')
-  }
-
-  const startSession = () => {
-    if (pois.length === 0) return
-    setSelectedPoiId(pois[0].id)
-    setScreen('poi-list')
+    setErrorMessage('')
+    socket.emit('party_join', { code: cleaned, name: playerName.trim() })
   }
 
   const openPoi = (poiId) => {
@@ -105,12 +245,28 @@ function App() {
   }
 
   const markArrived = (value) => {
-    if (!selectedPoi) return
-    setArrivedMap((prev) => ({ ...prev, [selectedPoi.id]: value }))
-    if (value) {
-      setScreen('poi-detail')
-    }
+  if (!selectedPoi) return
+  if (!value) return
+  if (!userId || !gameId) {
+    setErrorMessage('Join a live game before checking location.')
+    return
   }
+  setErrorMessage('')
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      console.log('Your coords:', pos.coords.latitude, pos.coords.longitude)
+      socket.emit('location_check', {
+        user_id: userId,
+        game_id: gameId,
+        location_id: selectedPoi.id,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      })
+    },
+    () => setErrorMessage('Could not get your location. Please enable GPS.'),
+    { enableHighAccuracy: true },
+  )
+}
 
   const selectAnswer = (questionId, optionIndex) => {
     if (!selectedPoi) return
@@ -125,24 +281,23 @@ function App() {
 
   const submitQuiz = () => {
     if (!selectedPoi) return
+    if (!userId || !gameId) {
+      setErrorMessage('Join a live game before submitting answers.')
+      return
+    }
     const answerSet = quizAnswers[selectedPoi.id] ?? {}
-    const correctAnswers = selectedPoi.quiz.filter(
-      (q) => answerSet[q.id] === q.answerIndex,
-    ).length
-    const totalQuestions = selectedPoi.quiz.length
-
-    const score = calculatePoiScore({
-      correctAnswers,
-      totalQuestions,
-      arrived: !!arrivedMap[selectedPoi.id],
+    const orderedAnswers = selectedPoi.quiz.map((q) => {
+      const picked = answerSet[q.id]
+      if (typeof picked !== 'number') return null
+      return String.fromCharCode(65 + picked)
     })
 
-    setQuizResultByPoi((prev) => ({
-      ...prev,
-      [selectedPoi.id]: { correctAnswers, totalQuestions, score },
-    }))
-    setCompletedMap((prev) => ({ ...prev, [selectedPoi.id]: true }))
-    setScreen('poi-list')
+    socket.emit('quiz_answer', {
+      user_id: userId,
+      game_id: gameId,
+      location_id: selectedPoi.id,
+      answers: orderedAnswers,
+    })
   }
 
   const resetGame = () => {
@@ -152,17 +307,21 @@ function App() {
     setSessionCode('')
     setPlayerName('')
     setSecondsRemaining(20 * 60)
-    setPois(SAMPLE_POIS)
-    setSelectedPoiId(SAMPLE_POIS[0].id)
+    setPois([])
+    setSelectedPoiId(null)
     setArrivedMap({})
     setCompletedMap({})
     setQuizAnswers({})
     setQuizResultByPoi({})
+    setUserId('')
+    setGameId('')
+    setErrorMessage('')
+    setLeaderboard([])
+    setGameStarted(false)
   }
 
   const renderHeader = () => {
-    if (screen === 'home' || screen === 'join' || screen === 'create') return null
-
+    if (['home', 'join', 'create', 'lobby'].includes(screen)) return null
     return (
       <header className="page-header">
         <div>
@@ -185,10 +344,11 @@ function App() {
         <TimerBanner
           secondsRemaining={secondsRemaining}
           status={gameStatus}
-          onForceEnd={() => setSecondsRemaining(0)}
+          onForceEnd={() => socket.emit('game_end', { code: sessionCode, user_id: userId })}
         />
       )}
 
+      {/* HOME */}
       {screen === 'home' && (
         <section className="panel home-panel">
           <h1>Oasis Hunt</h1>
@@ -197,21 +357,22 @@ function App() {
             the leaderboard.
           </p>
           <div className="button-stack">
-            <button className="primary-btn" onClick={startCreate}>
+            <button className="primary-btn" onClick={() => { setMode('host'); setScreen('create') }}>
               Create
             </button>
-            <button className="primary-btn" onClick={goJoin}>
+            <button className="primary-btn" onClick={() => { setMode('player'); setScreen('join') }}>
               Join
             </button>
           </div>
         </section>
       )}
 
+      {/* CREATE */}
       {screen === 'create' && (
         <section className="panel">
           <h2>Create Session</h2>
-          <p className="subtle">Assign host details, review POIs, then launch.</p>
-
+          <p className="subtle">Enter your name and launch the game.</p>
+          {errorMessage && <p className="subtle error">{errorMessage}</p>}
           <label className="field">
             Host / Team name
             <input
@@ -220,35 +381,41 @@ function App() {
               placeholder="Ex: Campus Explorers"
             />
           </label>
-
-          <label className="field">
-            Session code
-            <input value={sessionCode} readOnly />
-          </label>
-
-          <div className="poi-list-mini">
-            {pois.map((poi, index) => (
-              <div key={poi.id} className="poi-mini-item">
-                <strong>P{index + 1}:</strong> {poi.title}
-                <span>{poi.distanceMeters}m</span>
-              </div>
-            ))}
-          </div>
-
           <div className="row-actions">
-            <button className="secondary-btn" onClick={() => setSessionCode(generateSessionCode())}>
-              Regenerate Code
+            <button className="secondary-btn" onClick={() => setScreen('home')}>
+              Back
             </button>
-            <button className="primary-btn" onClick={startSession}>
-              Start Session
+            <button className="primary-btn" onClick={startSession} disabled={isLoading}>
+              {isLoading ? 'Creating...' : 'Create Session'}
             </button>
           </div>
         </section>
       )}
 
+      {/* LOBBY */}
+      {screen === 'lobby' && (
+        <section className="panel">
+          <h2>Waiting for players</h2>
+          <p className="subtle">Share this code with your players:</p>
+          <h1 style={{ letterSpacing: '0.2em', margin: '1rem 0' }}>{sessionCode}</h1>
+          <p className="subtle">Players can join at the Join screen.</p>
+          {errorMessage && <p className="subtle error">{errorMessage}</p>}
+          <div className="row-actions">
+            <button className="secondary-btn" onClick={resetGame}>
+              Cancel
+            </button>
+            <button className="primary-btn" onClick={triggerGameStart}>
+              Start Game
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* JOIN */}
       {screen === 'join' && (
         <section className="panel">
           <h2>Join Session</h2>
+          {errorMessage && <p className="subtle error">{errorMessage}</p>}
           <label className="field">
             Your name
             <input
@@ -277,6 +444,16 @@ function App() {
         </section>
       )}
 
+      {/* WAITING */}
+      {screen === 'waiting' && (
+        <section className="panel">
+          <h2>Waiting for host to start...</h2>
+          <p className="subtle">You've joined session <strong>{sessionCode}</strong>.</p>
+          <p className="subtle">The game will begin shortly.</p>
+        </section>
+      )}
+
+      {/* POI LIST */}
       {screen === 'poi-list' && (
         <section className="panel">
           <h2>POIs</h2>
@@ -304,36 +481,34 @@ function App() {
         </section>
       )}
 
+      {/* POI CHECK */}
       {screen === 'poi-check' && selectedPoi && (
         <section className="panel">
           <h2>{selectedPoi.title}</h2>
-          <p className="subtle">POI #{pois.findIndex((p) => p.id === selectedPoi.id) + 1} route check</p>
-          <p>
-            Current distance: <strong>{selectedPoi.distanceMeters}m</strong>
+          <p className="subtle">
+            POI #{pois.findIndex((p) => p.id === selectedPoi.id) + 1} route check
           </p>
-
+          {errorMessage && <p className="subtle error">{errorMessage}</p>}
           <div className="row-actions">
-            <button className="secondary-btn" onClick={() => markArrived(false)}>
-              Not yet arrived
+            <button className="secondary-btn" onClick={() => setScreen('poi-list')}>
+              Not yet
             </button>
             <button className="primary-btn" onClick={() => markArrived(true)}>
               I arrived
             </button>
           </div>
-
-          {arrivedMap[selectedPoi.id] === false && (
-            <p className="warning-box">You’re not close enough yet — get closer to unlock this POI.</p>
-          )}
-
           <button className="ghost-btn" onClick={() => setScreen('poi-list')}>
             Back to list
           </button>
         </section>
       )}
 
+      {/* POI DETAIL */}
       {screen === 'poi-detail' && selectedPoi && (
         <section className="panel">
-          <img src={selectedPoi.imageUrl} alt={selectedPoi.title} className="poi-image" />
+          {selectedPoi.imageUrl && (
+            <img src={selectedPoi.imageUrl} alt={selectedPoi.title} className="poi-image" />
+          )}
           <h2>{selectedPoi.title}</h2>
           <p>{selectedPoi.description}</p>
           <div className="row-actions">
@@ -347,10 +522,12 @@ function App() {
         </section>
       )}
 
+      {/* QUIZ */}
       {screen === 'quiz' && selectedPoi && (
         <section className="panel">
           <h2>{selectedPoi.title} Quiz</h2>
           <p className="subtle">{selectedPoi.quiz.length} questions</p>
+          {errorMessage && <p className="subtle error">{errorMessage}</p>}
           <div className="quiz-stack">
             {selectedPoi.quiz.map((question, qIdx) => (
               <article key={question.id} className="quiz-card">
@@ -359,8 +536,7 @@ function App() {
                 </p>
                 <div className="option-grid">
                   {question.options.map((option, oIdx) => {
-                    const selected =
-                      quizAnswers[selectedPoi.id]?.[question.id] === oIdx
+                    const selected = quizAnswers[selectedPoi.id]?.[question.id] === oIdx
                     return (
                       <button
                         key={option}
@@ -381,34 +557,24 @@ function App() {
               Back
             </button>
             <button className="primary-btn" onClick={submitQuiz}>
-              Progress
+              Submit
             </button>
           </div>
         </section>
       )}
 
+      {/* LEADERBOARD */}
       {screen === 'leaderboard' && (
         <section className="panel">
           <h2>Leaderboard</h2>
           <p className="subtle">Session ended. Final ranking is shown below.</p>
           <ol className="leaderboard-list">
-            {[
-              ...SAMPLE_LEADERBOARD,
-              {
-                id: 'self',
-                name: playerName || 'You',
-                score: totalScore,
-                completed: completedCount,
-                timeBonus: Math.floor(secondsRemaining / 60),
-              },
-            ]
+            {(leaderboard.length > 0 ? leaderboard : SAMPLE_LEADERBOARD)
               .sort((a, b) => b.score - a.score)
-              .map((entry) => (
-                <li key={entry.id} className="leader-item">
+              .map((entry, i) => (
+                <li key={entry.user_id ?? entry.id ?? i} className="leader-item">
                   <span>{entry.name}</span>
-                  <span>
-                    {entry.score} pts · {entry.completed} POIs · +{entry.timeBonus} bonus
-                  </span>
+                  <span>{entry.score} pts</span>
                 </li>
               ))}
           </ol>
