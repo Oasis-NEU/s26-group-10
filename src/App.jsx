@@ -9,6 +9,12 @@ import { connectSocket, disconnectSocket, socket } from './lib/socket'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 const DEFAULT_MAP_ID = import.meta.env.VITE_DEFAULT_MAP_ID ?? 'b5158f57-3278-4ddd-9cb4-a434d1c4449b'
 
+const getDirectionsUrl = (lat, lng) => {
+  const isApple = /iPhone|iPad|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document
+  if (isApple) return `maps://maps.apple.com/?daddr=${lat},${lng}`
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+}
+
 function App() {
   const [screen, setScreen] = useState('home')
   const [mode, setMode] = useState('player')
@@ -83,15 +89,31 @@ function App() {
     }
 
     const onGameStarted = (payload) => {
-      const mappedPois = (payload.locations ?? []).map((loc) => ({
-        id: loc.id,
-        title: loc.name,
-        description: loc.info ?? '',
-        distanceMeters: 0,
-        points: loc.point_value ?? 100,
-        imageUrl: '',
-        quiz: [],
-      }))
+      const mappedPois = (payload.locations ?? []).map((loc) => {
+        let lat = null
+        let lng = null
+        if (typeof loc.coords === 'string' && loc.coords.length >= 42) {
+          const hex = loc.coords
+          const buf = new Uint8Array(hex.length / 2)
+          for (let i = 0; i < buf.length; i++) buf[i] = parseInt(hex.substr(i * 2, 2), 16)
+          const dv = new DataView(buf.buffer)
+          const le = buf[0] === 1
+          const offset = buf.length - 16
+          lng = dv.getFloat64(offset, le)
+          lat = dv.getFloat64(offset + 8, le)
+        }
+        return {
+          id: loc.id,
+          title: loc.name,
+          description: loc.info ?? '',
+          distanceMeters: 0,
+          points: loc.point_value ?? 100,
+          imageUrl: '',
+          quiz: [],
+          lat,
+          lng,
+        }
+      })
       setPois(mappedPois)
       if (mappedPois.length > 0) setSelectedPoiId(mappedPois[0].id)
       setSecondsRemaining(payload.timer_seconds ?? 20 * 60)
@@ -111,19 +133,19 @@ function App() {
         prev.map((poi) =>
           poi.id === location.id
             ? {
-                ...poi,
-                title: location.name ?? poi.title,
-                description: location.info ?? poi.description,
-                points: location.point_value ?? poi.points,
-                quiz: (payload.questions ?? []).map((q) => ({
-                  id: q.id,
-                  prompt: q.body,
-                  options: Array.isArray(q.options)
-                    ? q.options
-                    : JSON.parse(q.options ?? '[]'),
-                  answerIndex: 0,
-                })),
-              }
+              ...poi,
+              title: location.name ?? poi.title,
+              description: location.info ?? poi.description,
+              points: location.point_value ?? poi.points,
+              quiz: (payload.questions ?? []).map((q) => ({
+                id: q.id,
+                prompt: q.body,
+                options: Array.isArray(q.options)
+                  ? q.options
+                  : JSON.parse(q.options ?? '[]'),
+                answerIndex: 0,
+              })),
+            }
             : poi,
         ),
       )
@@ -251,28 +273,28 @@ function App() {
   }
 
   const markArrived = (value) => {
-  if (!selectedPoi) return
-  if (!value) return
-  if (!userId || !gameId) {
-    setErrorMessage('Join a live game before checking location.')
-    return
+    if (!selectedPoi) return
+    if (!value) return
+    if (!userId || !gameId) {
+      setErrorMessage('Join a live game before checking location.')
+      return
+    }
+    setErrorMessage('')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        console.log('Your coords:', pos.coords.latitude, pos.coords.longitude)
+        socket.emit('location_check', {
+          user_id: userId,
+          game_id: gameId,
+          location_id: selectedPoi.id,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        })
+      },
+      () => setErrorMessage('Could not get your location. Please enable GPS.'),
+      { enableHighAccuracy: true },
+    )
   }
-  setErrorMessage('')
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      console.log('Your coords:', pos.coords.latitude, pos.coords.longitude)
-      socket.emit('location_check', {
-        user_id: userId,
-        game_id: gameId,
-        location_id: selectedPoi.id,
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-      })
-    },
-    () => setErrorMessage('Could not get your location. Please enable GPS.'),
-    { enableHighAccuracy: true },
-  )
-}
 
   const selectAnswer = (questionId, optionIndex) => {
     if (!selectedPoi) return
@@ -481,6 +503,16 @@ function App() {
                   <div className="row-actions" style={{ alignItems: 'center' }}>
                     {isFailed && <span className="failed-badge">Wrong Answer</span>}
                     {isComplete && !isFailed && <span className="complete-badge">Complete</span>}
+                    {poi.lat && poi.lng && (
+                      <a
+                        href={getDirectionsUrl(poi.lat, poi.lng)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="secondary-btn"
+                      >
+                        Directions
+                      </a>
+                    )}
                     {!isComplete && (
                       <button className="primary-btn" onClick={() => openPoi(poi.id)}>
                         Open
