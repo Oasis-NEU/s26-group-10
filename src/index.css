@@ -3,8 +3,8 @@
     Helvetica, Arial, sans-serif;
   line-height: 1.45;
   font-weight: 400;
-  color: #e2e8f0;
-  background: #080b13;
+  color: #f1f1f1;
+  background: #0a0a0a;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -20,10 +20,11 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    radial-gradient(circle at 20% -10%, rgba(37, 99, 235, 0.18), transparent 32%),
-    radial-gradient(circle at 100% 0%, rgba(14, 165, 233, 0.12), transparent 28%),
-    linear-gradient(180deg, #0b1020 0%, #0f172a 55%, #111827 100%);
-  color: #e2e8f0;
+    radial-gradient(circle at 15% -5%, rgba(204, 0, 0, 0.22), transparent 35%),
+    radial-gradient(circle at 90% 10%, rgba(180, 0, 0, 0.14), transparent 30%),
+    radial-gradient(circle at 50% 100%, rgba(120, 0, 0, 0.1), transparent 40%),
+    linear-gradient(180deg, #0a0a0a 0%, #111111 55%, #0d0d0d 100%);
+  color: #f1f1f1;
 }
 
 #root {
