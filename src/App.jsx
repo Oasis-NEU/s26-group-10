@@ -5,6 +5,14 @@ import ProgressBar from './components/ProgressBar'
 import { SAMPLE_LEADERBOARD } from './data/mockData'
 import { getGameStatus } from './utils/game'
 import { connectSocket, disconnectSocket, socket } from './lib/socket'
+import AdminLogin from './components/admin/AdminLogin'
+import AdminDashboard from './components/admin/AdminDashboard'
+import AdminMaps from './components/admin/AdminMaps'
+import AdminQuestions from './components/admin/AdminQuestions'
+import AdminGames from './components/admin/AdminGames'
+import AdminUsers from './components/admin/AdminUsers'
+import AdminAnalytics from './components/admin/AdminAnalytics'
+import AdminSettings from './components/admin/AdminSettings'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 const DEFAULT_MAP_ID = import.meta.env.VITE_DEFAULT_MAP_ID ?? 'b5158f57-3278-4ddd-9cb4-a434d1c4449b'
@@ -24,7 +32,7 @@ function App() {
   const [secondsRemaining, setSecondsRemaining] = useState(20 * 60)
   const [pois, setPois] = useState([])
   const [selectedPoiId, setSelectedPoiId] = useState(null)
-  const [arrivedMap, setArrivedMap] = useState({})
+  const [, setArrivedMap] = useState({})
   const [completedMap, setCompletedMap] = useState({})
   const [failedMap, setFailedMap] = useState({})
   const [quizAnswers, setQuizAnswers] = useState({})
@@ -35,7 +43,9 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('')
   const [leaderboard, setLeaderboard] = useState([])
   const [isLoading, setIsLoading] = useState(false)
-  const [gameStarted, setGameStarted] = useState(false)
+  const [, setGameStarted] = useState(false)
+  const [adminUserId, setAdminUserId] = useState('')
+  const [adminLocationId, setAdminLocationId] = useState(null)
 
   const modeRef = useRef(mode)
   useEffect(() => { modeRef.current = mode }, [mode])
@@ -370,7 +380,7 @@ function App() {
     <main className="app-shell">
       {renderHeader()}
 
-      {['poi-list', 'poi-check', 'poi-detail', 'quiz'].includes(screen) && (
+      {['poi-list', 'poi-check', 'poi-detail', 'poi-info', 'quiz'].includes(screen) && (
         <TimerBanner
           secondsRemaining={secondsRemaining}
           status={gameStatus}
@@ -392,6 +402,9 @@ function App() {
             </button>
             <button className="primary-btn" onClick={() => { setMode('player'); setScreen('join') }}>
               Join
+            </button>
+            <button className="ghost-btn" onClick={() => setScreen('admin-login')}>
+              Admin
             </button>
           </div>
         </section>
@@ -560,8 +573,28 @@ function App() {
             <button className="secondary-btn" onClick={() => setScreen('poi-list')}>
               Save for later
             </button>
+            <button className="primary-btn" onClick={() => setScreen('poi-info')}>
+              Learn & Continue
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* POI INFO — study material before the quiz */}
+      {screen === 'poi-info' && selectedPoi && (
+        <section className="panel">
+          <p className="eyebrow">Read Carefully</p>
+          <h2>{selectedPoi.title}</h2>
+          <p className="subtle">The quiz will be based on the information below.</p>
+          <article className="info-card">
+            <p>{selectedPoi.description}</p>
+          </article>
+          <div className="row-actions">
+            <button className="secondary-btn" onClick={() => setScreen('poi-detail')}>
+              Back
+            </button>
             <button className="primary-btn" onClick={() => setScreen('quiz')}>
-              Take quiz
+              Start Quiz
             </button>
           </div>
         </section>
@@ -669,6 +702,84 @@ function App() {
             Back to Start
           </button>
         </section>
+      )}
+
+      {/* ADMIN SCREENS */}
+      {screen === 'admin-login' && (
+        <AdminLogin
+          backendUrl={BACKEND_URL}
+          onLogin={(id) => { setAdminUserId(id); setScreen('admin-dashboard') }}
+          onBack={() => setScreen('home')}
+        />
+      )}
+
+      {screen === 'admin-dashboard' && (
+        <AdminDashboard
+          backendUrl={BACKEND_URL}
+          adminUserId={adminUserId}
+          onNavigate={(s) => setScreen(s)}
+          onLogout={() => { setAdminUserId(''); setScreen('home') }}
+        />
+      )}
+
+      {screen === 'admin-maps' && (
+        <AdminMaps
+          backendUrl={BACKEND_URL}
+          adminUserId={adminUserId}
+          onNavigate={() => {}}
+          onBack={() => setScreen('admin-dashboard')}
+        />
+      )}
+
+      {screen === 'admin-maps-for-questions' && (
+        <AdminMaps
+          backendUrl={BACKEND_URL}
+          adminUserId={adminUserId}
+          selectForQuestions
+          onNavigate={(s, locId) => { setAdminLocationId(locId); setScreen('admin-questions') }}
+          onBack={() => setScreen('admin-dashboard')}
+        />
+      )}
+
+      {screen === 'admin-questions' && adminLocationId && (
+        <AdminQuestions
+          backendUrl={BACKEND_URL}
+          adminUserId={adminUserId}
+          locationId={adminLocationId}
+          onBack={() => setScreen('admin-maps-for-questions')}
+        />
+      )}
+
+      {screen === 'admin-games' && (
+        <AdminGames
+          backendUrl={BACKEND_URL}
+          adminUserId={adminUserId}
+          onBack={() => setScreen('admin-dashboard')}
+        />
+      )}
+
+      {screen === 'admin-users' && (
+        <AdminUsers
+          backendUrl={BACKEND_URL}
+          adminUserId={adminUserId}
+          onBack={() => setScreen('admin-dashboard')}
+        />
+      )}
+
+      {screen === 'admin-analytics' && (
+        <AdminAnalytics
+          backendUrl={BACKEND_URL}
+          adminUserId={adminUserId}
+          onBack={() => setScreen('admin-dashboard')}
+        />
+      )}
+
+      {screen === 'admin-settings' && (
+        <AdminSettings
+          backendUrl={BACKEND_URL}
+          adminUserId={adminUserId}
+          onBack={() => setScreen('admin-dashboard')}
+        />
       )}
     </main>
   )
