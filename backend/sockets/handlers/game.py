@@ -3,6 +3,54 @@ from db.client import supabase
 
 active_timers = {}
 
+
+async def run_timer(code, seconds, sio):
+    for remaining in range(seconds, -1, -1):
+        await sio.emit("timer_tick", {"seconds_remaining": remaining}, room=code)
+        if remaining == 0:
+            await end_game(code, sio)
+            return
+        await asyncio.sleep(1)
+
+
+async def end_game(code, sio):
+    supabase.table("games").update({
+        "status": "ended",
+        "is_over": True,
+    }).eq("code", code).execute()
+
+    game = supabase.table("games")\
+        .select("id")\
+        .eq("code", code)\
+        .maybe_single().execute()
+
+    if not game or not game.data:
+        return
+
+    scores = supabase.table("score")\
+        .select("score, users(id, name)")\
+        .eq("game_id", game.data["id"])\
+        .order("score", desc=True)\
+        .execute()
+
+    leaderboard = [
+        {
+            "name": row["users"]["name"],
+            "user_id": row["users"]["id"],
+            "score": row["score"],
+        }
+        for row in scores.data
+    ]
+
+    if leaderboard:
+        supabase.table("games").update({
+            "winner_id": leaderboard[0]["user_id"]
+        }).eq("code", code).execute()
+
+    await sio.emit("game_ended", {"leaderboard": leaderboard}, room=code)
+    active_timers.pop(code, None)
+
+
 def register(sio):
 
     @sio.event
@@ -52,54 +100,8 @@ def register(sio):
             await sio.emit("error", {"message": "Missing session code"}, to=sid)
             return
 
-        # Cancel the running timer task if one exists
         task = active_timers.pop(code, None)
         if task:
             task.cancel()
 
         await end_game(code, sio)
-
-    async def run_timer(code, seconds, sio):
-        for remaining in range(seconds, -1, -1):
-            await sio.emit("timer_tick", {"seconds_remaining": remaining}, room=code)
-            if remaining == 0:
-                await end_game(code, sio)
-                return
-            await asyncio.sleep(1)
-
-    async def end_game(code, sio):
-        supabase.table("games").update({
-            "status": "ended",
-            "is_over": True,
-        }).eq("code", code).execute()
-
-        game = supabase.table("games")\
-            .select("id")\
-            .eq("code", code)\
-            .maybe_single().execute()
-
-        if not game or not game.data:
-            return
-
-        scores = supabase.table("score")\
-            .select("score, users(id, name)")\
-            .eq("game_id", game.data["id"])\
-            .order("score", desc=True)\
-            .execute()
-
-        leaderboard = [
-            {
-                "name": row["users"]["name"],
-                "user_id": row["users"]["id"],
-                "score": row["score"],
-            }
-            for row in scores.data
-        ]
-
-        if leaderboard:
-            supabase.table("games").update({
-                "winner_id": leaderboard[0]["user_id"]
-            }).eq("code", code).execute()
-
-        await sio.emit("game_ended", {"leaderboard": leaderboard}, room=code)
-        active_timers.pop(code, None)

@@ -83,17 +83,23 @@ def register(sio):
 
         points_earned = round(location.data["point_value"] * accuracy)
 
-        supabase.rpc("increment_score", {
-            "game_id": data["game_id"],
-            "player_id": data["user_id"],
-            "amount": points_earned,
-        }).execute()
+        try:
+            supabase.rpc("increment_score", {
+                "game_id": data["game_id"],
+                "player_id": data["user_id"],
+                "amount": points_earned,
+            }).execute()
+        except Exception:
+            pass  # RPC may return 204 No Content
 
         # Record the visit so they can't score this location again
-        supabase.table("player_visits").insert({
-            "player_id": data["user_id"],
-            "location_id": data["location_id"],
-        }).execute()
+        try:
+            supabase.table("player_visits").insert({
+                "player_id": data["user_id"],
+                "location_id": data["location_id"],
+            }).execute()
+        except Exception:
+            pass  # Insert may return 204 No Content
 
         breakdown = [
             {
