@@ -3,9 +3,8 @@
 A location-based multiplayer quiz game built for Northeastern University's campus. Players join sessions via a code, navigate to real-world points of interest (POIs) using GPS, read study material, answer quizzes at each location, and compete on a live leaderboard.
 
 ## Live Demo
+https://neu-go.vercel.app
 
-- **Frontend**: https://neu-go.vercel.app
-- **Backend**: https://neugo.onrender.com
 
 ## Features
 
