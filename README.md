@@ -100,7 +100,7 @@ Navigate to the home screen and click **Admin**. Log in with a user UUID that ha
 - **Maps & Locations** — CRUD for maps and their associated POI locations
 - **Questions** — Create/edit/delete quiz questions per location (options stored as JSON array, correct_answer is the full option text)
 - **Games** — View active/completed games, force-end, kick players, cleanup stale sessions
-- **Users** — Search, ban/unban users
+- **Users** — Search users
 - **Analytics** — Summary stats and global leaderboard
 - **Settings** — Configure global parameters:
   - `default_timer_seconds` — default game timer (used when creating a session)
