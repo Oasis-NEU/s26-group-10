@@ -90,13 +90,16 @@ function App() {
     [quizResultByPoi],
   )
 
-  // Update POI distances from player's GPS every 5 seconds
-  useEffect(() => {
-    if (!navigator.geolocation) return
+  const [geoEnabled, setGeoEnabled] = useState(false)
+  const geoIntervalRef = useRef(null)
+
+  const startGeoTracking = () => {
+    if (!navigator.geolocation || geoIntervalRef.current) return
     const update = () => {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const { latitude, longitude } = pos.coords
+          setGeoEnabled(true)
           setPois((prev) =>
             prev.map((poi) => ({
               ...poi,
@@ -112,9 +115,12 @@ function App() {
       )
     }
     update()
-    const id = setInterval(update, 5000)
-    return () => clearInterval(id)
-  }, [pois.length])
+    geoIntervalRef.current = setInterval(update, 5000)
+  }
+
+  useEffect(() => {
+    return () => { if (geoIntervalRef.current) clearInterval(geoIntervalRef.current) }
+  }, [])
 
   // Socket listeners — runs ONCE on mount, refs keep values fresh
   useEffect(() => {
@@ -539,7 +545,14 @@ function App() {
       {/* POI LIST */}
       {screen === 'poi-list' && (
         <section className="panel">
-          <h2>POIs</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2>POIs</h2>
+            {!geoEnabled && (
+              <button className="secondary-btn" onClick={startGeoTracking}>
+                Enable GPS
+              </button>
+            )}
+          </div>
           <ProgressBar completed={completedCount} total={pois.length} />
           <div className="poi-cards">
             {pois.map((poi, idx) => {
