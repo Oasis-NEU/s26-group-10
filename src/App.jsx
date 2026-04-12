@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import TimerBanner from './components/TimerBanner'
 import ProgressBar from './components/ProgressBar'
+import Particles from './components/Particles'
 import { SAMPLE_LEADERBOARD } from './data/mockData'
 import { getGameStatus } from './utils/game'
 import { connectSocket, disconnectSocket, socket } from './lib/socket'
@@ -377,6 +378,8 @@ function App() {
   }
 
   return (
+    <>
+    <Particles />
     <main className="app-shell">
       {renderHeader()}
 
@@ -391,7 +394,7 @@ function App() {
       {/* HOME */}
       {screen === 'home' && (
         <section className="panel home-panel">
-          <h1>Oasis Hunt</h1>
+          <h1>NEU Go!</h1>
           <p className="subtle">
             Build a route, join with a code, reach POIs, answer quizzes, and climb
             the leaderboard.
@@ -782,6 +785,7 @@ function App() {
         />
       )}
     </main>
+    </>
   )
 }
 

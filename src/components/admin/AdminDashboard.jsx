@@ -53,7 +53,7 @@ export default function AdminDashboard({ backendUrl, adminUserId, onNavigate, on
         {tiles.map((tile) => (
           <button
             key={tile.screen}
-            className="admin-nav-tile"
+            className="secondary-btn"
             onClick={() => onNavigate(tile.screen)}
           >
             {tile.label}
