@@ -18,6 +18,17 @@ import AdminSettings from './components/admin/AdminSettings'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 const DEFAULT_MAP_ID = import.meta.env.VITE_DEFAULT_MAP_ID ?? 'b5158f57-3278-4ddd-9cb4-a434d1c4449b'
 
+const haversineDistance = (lat1, lng1, lat2, lng2) => {
+  const toRad = (x) => (x * Math.PI) / 180
+  const R = 6371000
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)))
+}
+
 const getDirectionsUrl = (lat, lng) => {
   const isApple = /iPhone|iPad|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document
   if (isApple) return `maps://maps.apple.com/?daddr=${lat},${lng}`
@@ -78,6 +89,32 @@ function App() {
       ),
     [quizResultByPoi],
   )
+
+  // Update POI distances from player's GPS every 5 seconds
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    const update = () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords
+          setPois((prev) =>
+            prev.map((poi) => ({
+              ...poi,
+              distanceMeters:
+                poi.lat && poi.lng
+                  ? haversineDistance(latitude, longitude, poi.lat, poi.lng)
+                  : 0,
+            })),
+          )
+        },
+        () => {},
+        { enableHighAccuracy: true },
+      )
+    }
+    update()
+    const id = setInterval(update, 5000)
+    return () => clearInterval(id)
+  }, [pois.length])
 
   // Socket listeners — runs ONCE on mount, refs keep values fresh
   useEffect(() => {
