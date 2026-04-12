@@ -424,9 +424,52 @@ p.error {
   }
 }
 
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem;
+}
+
+.stat-card {
+  border: 1.5px solid rgba(204, 0, 0, 0.2);
+  border-radius: 20px;
+  padding: 1rem 1.2rem;
+  background: #111;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.stat-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+
+.stat-label {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #666;
+}
+
+.admin-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
 @media (max-width: 640px) {
   .option-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-nav-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .timer-banner,

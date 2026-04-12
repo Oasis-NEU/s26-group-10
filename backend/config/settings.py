@@ -4,7 +4,7 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_key: str
     class Config:
-        env_file = "api.env"
+        env_file = ".env"
         extra = "ignore"
 
 settings = Settings()
