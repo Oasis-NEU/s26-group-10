@@ -60,11 +60,7 @@ def register(sio):
             return
 
         def normalize(answer: str) -> str:
-            # Handles "Option A" → "A", or already "A" → "A"
-            answer = answer.strip()
-            if answer.lower().startswith("option "):
-                return answer.split()[-1].upper()
-            return answer.upper()
+            return answer.strip().lower()
 
         correct = sum(
             1 for q, a in zip(questions.data, data["answers"])

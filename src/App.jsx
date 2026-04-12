@@ -371,7 +371,7 @@ function App() {
     const orderedAnswers = selectedPoi.quiz.map((q) => {
       const picked = answerSet[q.id]
       if (typeof picked !== 'number') return null
-      return String.fromCharCode(65 + picked)
+      return q.options[picked]
     })
 
     socket.emit('quiz_answer', {
