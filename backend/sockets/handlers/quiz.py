@@ -4,10 +4,20 @@ def register(sio):
 
     @sio.event
     async def location_check(sid, data):
+        # Get proximity threshold from settings, default 50m
+        threshold = 50
+        try:
+            setting = supabase.table("settings").select("value").eq("key", "proximity_threshold_meters").maybe_single().execute()
+            if setting and setting.data:
+                threshold = float(setting.data["value"])
+        except Exception:
+            pass
+
         result = supabase.rpc("check_player_at_location", {
             "player_lat": data["lat"],
             "player_lng": data["lng"],
             "location_id": data["location_id"],
+            "threshold_meters": threshold,
         }).execute()
 
         geo = result.data
