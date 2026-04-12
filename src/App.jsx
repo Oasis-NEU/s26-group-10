@@ -91,35 +91,35 @@ function App() {
   )
 
   const [geoEnabled, setGeoEnabled] = useState(false)
-  const geoIntervalRef = useRef(null)
+  const watchIdRef = useRef(null)
 
   const startGeoTracking = () => {
-    if (!navigator.geolocation || geoIntervalRef.current) return
-    const update = () => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords
-          setGeoEnabled(true)
-          setPois((prev) =>
-            prev.map((poi) => ({
+    if (!navigator.geolocation || watchIdRef.current != null) return
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords
+        console.log('[geo] position:', latitude, longitude)
+        setGeoEnabled(true)
+        setPois((prev) =>
+          prev.map((poi) => {
+            console.log('[geo] poi coords:', poi.title, poi.lat, poi.lng)
+            return {
               ...poi,
               distanceMeters:
-                poi.lat && poi.lng
+                poi.lat != null && poi.lng != null
                   ? haversineDistance(latitude, longitude, poi.lat, poi.lng)
                   : 0,
-            })),
-          )
-        },
-        () => {},
-        { enableHighAccuracy: true },
-      )
-    }
-    update()
-    geoIntervalRef.current = setInterval(update, 5000)
+            }
+          }),
+        )
+      },
+      (err) => console.warn('[geo] error:', err.message),
+      { enableHighAccuracy: true },
+    )
   }
 
   useEffect(() => {
-    return () => { if (geoIntervalRef.current) clearInterval(geoIntervalRef.current) }
+    return () => { if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current) }
   }, [])
 
   // Socket listeners — runs ONCE on mount, refs keep values fresh
