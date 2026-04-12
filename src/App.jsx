@@ -439,7 +439,7 @@ function App() {
         <section className="panel home-panel">
           <h1>NEU Go!</h1>
           <p className="subtle">
-            Build a route, join with a code, reach POIs, answer quizzes, and climb
+            Explore a route, join with a code, reach POIs, answer quizzes, and climb
             the leaderboard.
           </p>
           <div className="button-stack">
